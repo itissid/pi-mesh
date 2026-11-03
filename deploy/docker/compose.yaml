@@ -1,0 +1,71 @@
+name: pi-mesh
+
+services:
+  tailscale:
+    image: ${TAILSCALE_IMAGE:?Set an immutable tailscale/tailscale image digest}
+    restart: "${MESH_RESTART:-no}"
+    cap_drop: [ALL]
+    cap_add: [NET_ADMIN, NET_RAW]
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    environment:
+      TS_USERSPACE: "false"
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_AUTH_ONCE: "true"
+      TS_HOSTNAME: ${TS_HOSTNAME:-pi-mesh-broker}
+      TS_EXTRA_ARGS: --advertise-tags=tag:pi-mesh-broker --accept-dns=false --accept-routes=false --ssh=false
+      TS_AUTHKEY: file:/run/secrets/tailscale_authkey
+    secrets: [tailscale_authkey]
+    volumes:
+      - tailscale_state:/var/lib/tailscale
+    healthcheck:
+      test: ["CMD-SHELL", "tailscale status --json | grep -Eq '\"BackendState\"[[:space:]]*:[[:space:]]*\"Running\"'"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  broker:
+    image: pi-mesh-broker:0.10.3
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+      args:
+        NODE_IMAGE: ${NODE_IMAGE:?Set an immutable Node 24 image digest}
+    restart: "${MESH_RESTART:-no}"
+    network_mode: service:tailscale
+    depends_on:
+      tailscale:
+        condition: service_healthy
+    user: "1000:1000"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    environment:
+      MESH_TAILSCALE_IPV4: ${MESH_TAILSCALE_IPV4:-}
+      MESH_RUNTIME_DIR: /run/pi-mesh
+      MESH_STATE_DIR: /var/lib/pi-mesh
+    volumes:
+      - type: bind
+        source: ${MESH_HOST_ROOT:?Set an absolute host path outside Git}/runtime
+        target: /run/pi-mesh
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${MESH_HOST_ROOT:?Set an absolute host path outside Git}/state
+        target: /var/lib/pi-mesh
+        bind:
+          create_host_path: false
+    healthcheck:
+      test: ["CMD", "node", "-e", "const s=require('node:net').createConnection('/run/pi-mesh/broker.sock');s.setTimeout(2000);s.on('connect',()=>{s.destroy();process.exit(0)});s.on('error',()=>process.exit(1));s.on('timeout',()=>{s.destroy();process.exit(1)})"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+secrets:
+  tailscale_authkey:
+    file: ${MESH_HOST_ROOT:?Set an absolute host path outside Git}/tailscale-authkey
+
+volumes:
+  tailscale_state:

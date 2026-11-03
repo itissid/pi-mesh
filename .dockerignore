@@ -1,0 +1,17 @@
+# Allowlist build inputs for both legacy Docker builder and BuildKit.
+# Never send runtime state, credentials, .git, or host node_modules to the daemon.
+*
+!package.json
+!package-lock.json
+!tsconfig.json
+!index.ts
+!server.ts
+!src/
+!src/**
+!test/
+!test/**
+!scripts/
+!scripts/sync-version.mjs
+!deploy/
+!deploy/docker/
+!deploy/docker/broker-entrypoint.mjs
