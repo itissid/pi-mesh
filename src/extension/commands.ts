@@ -7,6 +7,7 @@ import { brokerLockPath, brokerSocketPath } from "../shared/paths.js";
 import { MESH_VERSION } from "../shared/version.js";
 import { attachClientListeners, updateSessionName } from "./attach.js";
 import type { MeshHud } from "./hud.js";
+import { completeMesh } from "./command-completions.js";
 import { identityFromClient, saveIdentityOf } from "../shared/identity-store.js";
 import type { ExtensionAPI, SessionContext } from "./pi-types.js";
 import type { GetRuntime, MeshRuntime } from "./tools.js";
@@ -450,8 +451,10 @@ export function registerCommands(
     if (!data) return undefined;
     return { render: (width) => renderStatusEntry(data, width, theme), invalidate: () => {} };
   });
+  const getRoomHints = () => [...(getHud()?.cachedRooms ?? []), ...(getRuntime()?.client.rooms ?? [])];
   pi.registerCommand("mesh", {
     description: "mesh inter-agent coms: status, join/leave, alias, log, ping, broker",
+    getArgumentCompletions: (prefix) => completeMesh(prefix, getRoomHints),
     handler: async (args, ctx) => {
       const rt = getRuntime();
       if (rt === null) {

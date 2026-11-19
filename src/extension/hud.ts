@@ -201,6 +201,11 @@ export class MeshHud {
     this.statusTimer.unref();
   }
 
+  /** Advisory room names from the last broker snapshot; never triggers a refresh. */
+  get cachedRooms(): readonly string[] {
+    return this.snapshot?.rooms ?? [];
+  }
+
   /** Local change (join/leave/log toggle): repaint + resync snapshot. */
   onLocalChange(): void {
     this.refresh();

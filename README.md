@@ -530,6 +530,9 @@ Env overrides: `MESH_ALIAS`, `MESH_ROOMS`, `MESH_IDENTITY_KEY`,
 leave <room> · alias [<new-alias>] · new [--history] · reset · log [on|off] ·
 ping <alias> · broker · help`.
 
+- Pi completes `/mesh` subcommands and common options. For `/mesh join`,
+  suggestions use cached room names and keep a valid name you type, even if
+  it's new. The suggestions don't contact the broker.
 - `/mesh status` sorts peers by their first alphabetical room, newest first
   within each room. Room colors match the `Rooms:` list; aliases and ages are
   green for connections under an hour old and red for older connections.

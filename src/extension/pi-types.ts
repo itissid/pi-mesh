@@ -134,8 +134,15 @@ export interface ToolDefinition {
   execute: ToolExecuteFn;
 }
 
+export interface CommandCompletion {
+  value: string;
+  label: string;
+  description?: string;
+}
+
 export interface CommandDefinition {
   description: string;
+  getArgumentCompletions?: (prefix: string) => CommandCompletion[] | null | Promise<CommandCompletion[] | null>;
   handler: (args: string, ctx: SessionContext) => void | Promise<void>;
 }
 
