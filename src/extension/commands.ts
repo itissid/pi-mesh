@@ -7,7 +7,8 @@ import { brokerLockPath, brokerSocketPath } from "../shared/paths.js";
 import { MESH_VERSION } from "../shared/version.js";
 import { attachClientListeners, updateSessionName } from "./attach.js";
 import type { MeshHud } from "./hud.js";
-import { completeMesh } from "./command-completions.js";
+import { completeMesh, completeMjoin } from "./command-completions.js";
+import { MJOIN_USAGE, parseMjoinArgs } from "./mjoin-args.js";
 import { identityFromClient, saveIdentityOf } from "../shared/identity-store.js";
 import type { ExtensionAPI, SessionContext } from "./pi-types.js";
 import type { GetRuntime, MeshRuntime } from "./tools.js";
@@ -17,6 +18,7 @@ import { makeStatusEntry, parseStatusArgs, renderStatusEntry, statusLines, STATU
 const HELP_TEXT = [
   `${STATUS_USAGE} — online peers, rooms and hosts`,
   "/mesh join <room> [as <alias>] [observer]",
+  `${MJOIN_USAGE} — shortcut for joining a room`,
   "/mesh leave <room>",
   "/mesh alias [<new-alias>] — show, or change this session's alias live",
   "/mesh new [--history]  — fresh pi session like /new, mesh identity (alias, rooms,",
@@ -452,6 +454,10 @@ export function registerCommands(
     return { render: (width) => renderStatusEntry(data, width, theme), invalidate: () => {} };
   });
   const getRoomHints = () => [...(getHud()?.cachedRooms ?? []), ...(getRuntime()?.client.rooms ?? [])];
+  const join = async (rt: MeshRuntime, ctx: SessionContext, parsed: ReturnType<typeof parseJoinArgs>) => {
+    await cmdJoin(rt, ctx, parsed.room, parsed.observer, parsed.asAlias, pi);
+    onChanged?.();
+  };
   pi.registerCommand("mesh", {
     description: "mesh inter-agent coms: status, join/leave, alias, log, ping, broker",
     getArgumentCompletions: (prefix) => completeMesh(prefix, getRoomHints),
@@ -483,8 +489,7 @@ export function registerCommands(
         case "join": {
   // `/mesh join <room> [as <alias>] [observer]`
           const parsed = parseJoinArgs(rest);
-          await cmdJoin(rt, ctx, parsed.room, parsed.observer, parsed.asAlias, pi);
-          onChanged?.();
+          await join(rt, ctx, parsed);
           break;
         }
         case "leave":
@@ -522,6 +527,23 @@ export function registerCommands(
         default:
           notify(ctx, `mesh: unknown subcommand '${sub}'\n${HELP_TEXT}`);
       }
+    },
+  });
+  pi.registerCommand("mjoin", {
+    description: "Join a mesh room, optionally choosing an alias and observer role",
+    getArgumentCompletions: (prefix) => completeMjoin(prefix, getRoomHints()),
+    handler: async (args, ctx) => {
+      const parsed = parseMjoinArgs(args.trim().split(/\s+/).filter(Boolean));
+      if (!parsed) {
+        notify(ctx, `usage: ${MJOIN_USAGE}`);
+        return;
+      }
+      const rt = getRuntime();
+      if (rt === null) {
+        notify(ctx, "mesh: session not started");
+        return;
+      }
+      await join(rt, ctx, parsed);
     },
   });
 }

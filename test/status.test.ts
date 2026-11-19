@@ -181,7 +181,7 @@ describe("/mesh status", () => {
       ui: { notify: (text) => notified.push(text), setStatus() {}, setWidget() {} },
     };
     const pi = {
-      registerCommand(_name: string, def: CommandDefinition) { command = def; },
+      registerCommand(name: string, def: CommandDefinition) { if (name === "mesh") command = def; },
       registerEntryRenderer(name: string, fn: EntryRenderer<StatusEntry>) {
         assert.equal(name, STATUS_ENTRY);
         renderer = fn;

@@ -1,4 +1,5 @@
 import { isValidRoom } from "../protocol/envelope.js";
+import { parseMjoinArgs } from "./mjoin-args.js";
 import type { CommandCompletion } from "./pi-types.js";
 
 const COMMANDS = [
@@ -43,7 +44,7 @@ function roomOperand(value: string): boolean {
 }
 
 /** `before` is the already typed subcommand and separator, or empty at a command root. */
-export function completeJoin(raw: string, before: string, rooms: readonly string[]): CommandCompletion[] {
+export function completeJoin(raw: string, before: string, rooms: readonly string[], compact = false): CommandCompletion[] {
   const [room, rest] = splitFirst(raw);
   if (rest === undefined) {
     const matches = [...new Set(rooms)].filter((name) => roomOperand(name) && name.startsWith(room)).sort();
@@ -56,6 +57,13 @@ export function completeJoin(raw: string, before: string, rooms: readonly string
   if (!roomOperand(room)) return [];
   const { tokens, fixed, prefix } = partialToken(rest);
   const argsBefore = before + raw.slice(0, raw.length - rest.length) + fixed;
+  if (compact) {
+    const parsed = parseMjoinArgs(argsBefore.trim().split(/\s+/));
+    const hints = parsed ? [...(parsed.asAlias ? [] : [AS]), ...(parsed.observer ? [] : [OBSERVER])] : [];
+    const items = matching(argsBefore, prefix, hints).filter(({ value }) => value !== before + raw);
+    const typed = (before + raw).trim().split(/\s+/);
+    return parseMjoinArgs(typed) ? keepTyped(before + raw, items) : items;
+  }
   const modifiers = tokens.join(" ");
   const hints = tokens.length === 0 ? [AS, OBSERVER]
     : modifiers === "observer" ? [AS]
@@ -75,6 +83,12 @@ function partialToken(raw: string): { tokens: string[]; fixed: string; prefix: s
   const prefix = /\S*$/.exec(raw)![0];
   const fixed = raw.slice(0, raw.length - prefix.length);
   return { tokens: fixed.split(/\s+/).filter(Boolean), fixed, prefix };
+}
+
+export function completeMjoin(raw: string, rooms: readonly string[]): CommandCompletion[] | null {
+  const before = /^\s*(?:observer\s+)?/.exec(raw)![0];
+  const items = completeJoin(raw.slice(before.length), before, rooms, true);
+  return items.length > 0 ? items : null;
 }
 
 export function completeMesh(raw: string, getRooms: () => readonly string[]): CommandCompletion[] | null {

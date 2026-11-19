@@ -540,8 +540,12 @@ ping <alias> · broker · help`.
   MagicDNS if reachable. The `tailscale` command is not required; unresolved
   names fall back to the IP. Add `--details` for exact connection timestamps,
   raw transport addresses, and full Tailscale DNS names.
-- `/mesh join ops as agent-1` claims the alias `agent-1` and joins room
-  `ops` in one step (live rename, rooms + reservations re-declared).
+- `/mesh join ops as agent-1` attempts a live rename, then joins `ops`.
+  `/mjoin ops agent-1` and `/mjoin ops as agent-1` do the same thing. The
+  alias is optional; add `observer` for the observer role. Use `@as` or
+  `@observer` if you want one of those reserved words as your alias. If
+  the broker refuses the rename, the command still joins under the current
+  alias. A successful rename is not rolled back if joining fails.
 - `/mesh new [--history]` opens a fresh pi session like `/new` but hands
   over the mesh identity (alias, rooms, reservations; `--history` also
   transfers the last 30 mesh frames as context). Stale handoffs expire
