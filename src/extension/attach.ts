@@ -5,7 +5,7 @@ import { AttachmentLifetime } from "./attachment-lifetime.js";
 import { handleCtlFrame } from "./ctl.js";
 import { readFileSync } from "node:fs";
 import type { WelcomeInfo } from "../client/client.js";
-import type { MeshFrame } from "../protocol/envelope.js";
+import { isValidAlias, isValidRoom, type MeshFrame } from "../protocol/envelope.js";
 import { buildBatchMessage, bypassesBatch, batchDetails, InboundBatcher } from "./batcher.js";
 import { DeferredInbox } from "./deferred-inbox.js";
 import { classifyInbound } from "./inbound-policy.js";
@@ -101,23 +101,30 @@ function firstUserMessage(sessionFile: string | undefined): string | undefined {
   return undefined;
 }
 
-/**
- * name the pi session so /resume and the session selector show the mesh
- * identity AND the conversation: `mesh @agent-1 · cs-room — <first message>`.
- * A user-defined name is NEVER overwritten; the mesh name is refreshed on
- * ready/rename/join/leave. The first message is kept exactly like pi's
- * default display (session.name ?? session.firstMessage) so nothing is lost.
- */
+const SESSION_NAME_SEPARATOR = " — ";
+
+/** Refresh mesh identity in /resume without replacing the conversation title. */
 export function updateSessionName(pi: ExtensionAPI, rt: MeshRuntime): void {
   try {
     if (typeof pi.getSessionName !== "function" || typeof pi.setSessionName !== "function") return;
-    const current = pi.getSessionName();
-    if (current !== undefined && current !== "" && !current.startsWith("mesh ")) return;
+    const current = pi.getSessionName() ?? "";
+    let suffix: string | undefined;
+    if (current !== "") {
+      const boundary = current.indexOf(SESSION_NAME_SEPARATOR);
+      const prefix = boundary < 0 ? current : current.slice(0, boundary);
+      const [identity, rooms, ...extra] = prefix.split(" · ");
+      if (!identity?.startsWith("mesh @") || !isValidAlias(identity.slice("mesh @".length))) return;
+      if (extra.length > 0 || (rooms !== undefined && !rooms.split(",").every(isValidRoom))) return;
+      if (boundary >= 0) suffix = current.slice(boundary + SESSION_NAME_SEPARATOR.length);
+    }
+    // Until a suffix exists, match Pi's first-message preview. Once set, the
+    // saved suffix is authoritative even if another extension wrote it.
+    suffix ??= firstUserMessage(rt.ctx?.sessionManager?.getSessionFile?.())?.replace(/[\r\n]+/g, " ");
     const rooms = rt.client.rooms.length > 0 ? ` · ${rt.client.rooms.join(",")}` : "";
-    const first = firstUserMessage(rt.ctx?.sessionManager?.getSessionFile?.());
-    pi.setSessionName(`mesh @${rt.client.alias}${rooms}${first !== undefined ? ` — ${first}` : ""}`);
+    const next = `mesh @${rt.client.alias}${rooms}${suffix ? `${SESSION_NAME_SEPARATOR}${suffix}` : ""}`;
+    if (next !== current) pi.setSessionName(next);
   } catch {
-  // best effort
+    // best effort
   }
 }
 

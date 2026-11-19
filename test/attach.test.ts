@@ -99,6 +99,26 @@ describe("updateSessionName (D31): /resume shows identity + first message", () =
     }
   });
 
+  it("updates identity without changing a saved conversation title", () => {
+    const { file, cleanup } = tmpSessionFile([
+      { type: "message", message: { role: "user", content: "Original prompt" } },
+    ]);
+    try {
+      const { pi, names } = fakePi("mesh @agent-1 · cs-room — Naming cleanup — follow-up");
+      updateSessionName(pi as never, fakeRt("alice", ["cs-room", "voice"], file));
+      updateSessionName(pi as never, fakeRt("alice", ["cs-room", "voice"], file));
+      assert.deepEqual(names, ["mesh @alice · cs-room,voice — Naming cleanup — follow-up"]);
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("leaves ordinary titles that start with the word mesh alone", () => {
+    const { pi, names } = fakePi("mesh networking notes");
+    updateSessionName(pi as never, fakeRt("agent-1", ["cs-room"]));
+    assert.deepEqual(names, []);
+  });
+
   it("refreshes existing mesh names; never overwrites user names", () => {
     const { pi, names } = fakePi("mesh @agent-1 · cs-room");
     updateSessionName(pi as never, fakeRt("agent-1", ["cs-room", "voice"]));
