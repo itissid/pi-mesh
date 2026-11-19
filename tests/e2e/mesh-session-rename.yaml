@@ -1,0 +1,24 @@
+version: 1
+id: mesh-session-rename
+title: Mesh-aware Pi session renames in Herdr
+demonstrate:
+  - id: preview
+    requirement: A session that has not been renamed shows its mesh alias, rooms, and first-message preview after mesh refreshes its title.
+    required: true
+    evidence:
+      - Original terminal output from a disposable Pi pane in macOS Herdr showing the first message and resulting title.
+  - id: rename
+    requirement: Renaming edits only the conversation title, keeps the exact mesh alias and room list, and does not duplicate the prefix.
+    required: true
+    evidence:
+      - Original terminal output captured through hc showing the rename command and title readback.
+  - id: refresh
+    requirement: A room change and a reload in the same Pi session keep the chosen conversation title, and the prefix reflects the current rooms.
+    required: true
+    evidence:
+      - Original terminal output captured through hc showing title readback after the room change and after reload.
+  - id: plain
+    requirement: Renaming a session with no mesh prefix still sets the plain title.
+    required: true
+    evidence:
+      - Original terminal output from a disposable Pi pane showing the plain rename and title readback.
