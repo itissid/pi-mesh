@@ -530,8 +530,10 @@ Env overrides: `MESH_ALIAS`, `MESH_ROOMS`, `MESH_IDENTITY_KEY`,
 leave <room> · alias [<new-alias>] · new [--history] · reset · log [on|off] ·
 ping <alias> · broker · help`.
 
-- `/mesh status` shows peers, rooms, remote hostnames, and connection ages
-  (for example, `3h ago`). It tries system DNS and, for Tailscale addresses,
+- `/mesh status` sorts peers by their first alphabetical room, newest first
+  within each room. Room colors match the `Rooms:` list; aliases and ages are
+  green for connections under an hour old and red for older connections.
+  Hostname lookup tries system DNS and, for Tailscale addresses,
   MagicDNS if reachable. The `tailscale` command is not required; unresolved
   names fall back to the IP. Add `--details` for exact connection timestamps,
   raw transport addresses, and full Tailscale DNS names.

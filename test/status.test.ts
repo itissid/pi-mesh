@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { visibleWidth } from "@mariozechner/pi-tui";
+import { stripVTControlCharacters } from "node:util";
 import { registerCommands } from "../src/extension/commands.js";
 import type { CommandDefinition, EntryRenderer, ExtensionAPI, RenderTheme, SessionContext } from "../src/extension/pi-types.js";
 import {
@@ -23,7 +24,7 @@ const status: StatusEntry = {
 
 const theme: RenderTheme = {
   fg(color, text) {
-    assert.equal(color, "text", "status text must not use the dim or muted palette");
+    assert.ok(!["dim", "muted"].includes(color), "status text must be readable");
     return `\x1b[37m${text}\x1b[39m`;
   },
   bold: (text) => `\x1b[1m${text}\x1b[22m`,
@@ -86,8 +87,8 @@ describe("/mesh status", () => {
     assert.deepEqual(statusLines(status), [
       "Mesh peers (3)",
       "  @mac · default · via macbook-pi-web · 3h ago",
-      "  @devbox · vm-env",
       "  @remote · default, vm-env · via 2001:db8::1",
+      "  @devbox · vm-env",
       "Rooms: default, vm-env",
     ]);
     const details = statusLines({ ...status, options: { details: true } }).join("\n");
@@ -104,12 +105,60 @@ describe("/mesh status", () => {
       { alias: "invalid", rooms: ["default"], since: "invalid" },
     ] });
     assert.deepEqual(rows.slice(1, -1), [
-      "  @new · default · just now",
       "  @skewed · default · just now",
+      "  @new · default · just now",
       "  @minutes · default · 9m ago",
       "  @days · default · 3d ago",
       "  @invalid · default",
     ]);
+  });
+
+  it("sorts rooms alphabetically, then connections newest first without duplicating multi-room peers", () => {
+    const lines = statusLines({ ...status, rooms: ["vm-env", "default"], peers: [
+      { alias: "no-room", rooms: [] },
+      { alias: "mouse", rooms: ["vm-env"], since: "2026-11-19T00:00:00Z" },
+      ...status.peers.slice(0, 1),
+      { alias: "multi", rooms: ["vm-env", "default"], since: "2026-11-19T00:00:00Z" },
+    ] });
+    assert.deepEqual(lines, [
+      "Mesh peers (4)",
+      "  @multi · default, vm-env · 3m ago",
+      "  @mac · default · via macbook-pi-web · 3h ago",
+      "  @mouse · vm-env · 3m ago",
+      "  @no-room · (no rooms)",
+      "Rooms: default, vm-env",
+    ]);
+  });
+
+  it("matches room colors to the legend and distinguishes recent, older, and undated connections", () => {
+    const colored: StatusEntry = { ...status, peers: [
+      ...status.peers,
+      { alias: "recent", rooms: ["default"], since: "2026-11-19T00:00:00Z" },
+    ] };
+    for (const appearance of ["dark", "light"] as const) {
+      const colors = new Map<string, number[]>();
+      const lines = renderStatusEntry(colored, 100, { ...theme, appearance, style(text, { fg }) {
+        colors.set(text, [fg.r, fg.g, fg.b]);
+        return `\x1b[38;2;${fg.r};${fg.g};${fg.b}m${text}\x1b[39m`;
+      } });
+      assert.deepEqual(lines.map(stripVTControlCharacters), statusLines(colored));
+      for (const room of colored.rooms) {
+        const color = colors.get(room);
+        assert.ok(color);
+        const token = `\x1b[38;2;${color.join(";")}m${room}\x1b[39m`;
+        assert.ok(lines.some((line) => line.includes("@recent") && room === "default" && line.includes(token))
+          || lines.some((line) => line.includes("@devbox") && room === "vm-env" && line.includes(token)));
+        assert.ok(lines.at(-1)?.includes(token));
+      }
+      assert.notDeepEqual(colors.get("default"), colors.get("vm-env"));
+      const recent = colors.get("@recent")!;
+      const older = colors.get("@mac")!;
+      assert.ok(recent[1]! > recent[0]! && recent[1]! > recent[2]!);
+      assert.ok(older[0]! > older[1]! && older[0]! > older[2]!);
+      assert.deepEqual(recent, colors.get("3m ago"));
+      assert.deepEqual(older, colors.get("3h ago"));
+      assert.equal(colors.has("@devbox"), false);
+    }
   });
 
   it("uses readable theme colors and wraps to narrow terminals", () => {

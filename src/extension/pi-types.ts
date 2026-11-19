@@ -246,6 +246,9 @@ export type ThemeBg =
 
 export interface RenderTheme {
   fg(color: ThemeColor, text: string): string;
+  readonly appearance?: "dark" | "light";
+  /** Modern Pi themes can adapt concrete colors to the terminal's color mode. */
+  style?(text: string, options: { fg: { kind: "rgb"; r: number; g: number; b: number } }): string;
   /** background application — absent in headless/test themes. */
   bg?(color: ThemeBg, text: string): string;
   /** Bold helper for the box label. */
