@@ -526,10 +526,15 @@ Env overrides: `MESH_ALIAS`, `MESH_ROOMS`, `MESH_IDENTITY_KEY`,
 `MESH_INBOUND_BATCH_MAX_HOLD_MS`, `MESH_POLICY`, `MESH_WATCHDOG=0`,
 `MESH_CONTEXT_VERBOSE=1`.
 
-**Commands** — `/mesh status [room] · join <room> [as <alias>] [observer] ·
+**Commands** — `/mesh status [room] [--details] · join <room> [as <alias>] [observer] ·
 leave <room> · alias [<new-alias>] · new [--history] · reset · log [on|off] ·
 ping <alias> · broker · help`.
 
+- `/mesh status` shows peers, rooms, remote hostnames, and connection ages
+  (for example, `3h ago`). It tries system DNS and, for Tailscale addresses,
+  MagicDNS if reachable. The `tailscale` command is not required; unresolved
+  names fall back to the IP. Add `--details` for exact connection timestamps,
+  raw transport addresses, and full Tailscale DNS names.
 - `/mesh join ops as agent-1` claims the alias `agent-1` and joins room
   `ops` in one step (live rename, rooms + reservations re-declared).
 - `/mesh new [--history]` opens a fresh pi session like `/new` but hands

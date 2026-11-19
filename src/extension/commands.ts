@@ -1,4 +1,4 @@
-// extension/commands.ts — /mesh command. All output via ctx.ui.notify.
+// extension/commands.ts — /mesh command.
 import { closeSync, openSync, readFileSync, readSync, statSync } from "node:fs";
 import { MeshClient } from "../client/client.js";
 import type { MeshRole } from "../protocol/envelope.js";
@@ -10,9 +10,11 @@ import type { MeshHud } from "./hud.js";
 import { identityFromClient, saveIdentityOf } from "../shared/identity-store.js";
 import type { ExtensionAPI, SessionContext } from "./pi-types.js";
 import type { GetRuntime, MeshRuntime } from "./tools.js";
+import { makeStatusEntry, parseStatusArgs, renderStatusEntry, statusLines, STATUS_ENTRY, STATUS_USAGE,
+  type StatusEntry, type StatusOptions } from "./status.js";
 
 const HELP_TEXT = [
-  "/mesh status [room]   — broker snapshot (online peers, rooms)",
+  `${STATUS_USAGE} — online peers, rooms and hosts`,
   "/mesh join <room> [as <alias>] [observer]",
   "/mesh leave <room>",
   "/mesh alias [<new-alias>] — show, or change this session's alias live",
@@ -66,7 +68,9 @@ function pidAlive(pid: number): boolean {
   }
 }
 
-async function cmdStatus(rt: MeshRuntime, ctx: SessionContext, room?: string): Promise<void> {
+async function cmdStatus(
+  rt: MeshRuntime, ctx: SessionContext, pi: ExtensionAPI, options: StatusOptions,
+): Promise<void> {
   if (!rt.client.isOnline()) {
     try {
       await rt.client.connect();
@@ -75,15 +79,12 @@ async function cmdStatus(rt: MeshRuntime, ctx: SessionContext, room?: string): P
       return;
     }
   }
-  const snap = await rt.client.status(room);
-  if (snap.peers.length === 0) {
-    notify(ctx, `mesh: no online peers${room !== undefined ? ` in room ${room}` : ""}`);
-    return;
+  const entry = await makeStatusEntry(await rt.client.status(options.room), options);
+  if (ctx.mode === "tui" && typeof pi.registerEntryRenderer === "function") {
+    pi.appendEntry(STATUS_ENTRY, entry);
+  } else {
+    notify(ctx, statusLines(entry).join("\n"));
   }
-  const lines = snap.peers.map(
-    (p) => `@${p.alias} rooms=${p.rooms.join(",")}${p.since !== undefined ? ` since=${p.since}` : ""}${p.via !== undefined ? ` via=${p.via} ⟵ other machine` : ""}`,
-  );
-  notify(ctx, `mesh peers (${snap.peers.length}):\n${lines.join("\n")}\nrooms: ${snap.rooms.join(", ") || "(none)"}`);
 }
 
 async function cmdJoin(
@@ -444,6 +445,11 @@ export function registerCommands(
   onChanged?: () => void, // HUD refresh after join/leave/log toggles
   getHud: () => MeshHud | null = () => null,
 ): void {
+  pi.registerEntryRenderer?.<StatusEntry>(STATUS_ENTRY, (entry, _options, theme) => {
+    const data = entry.data;
+    if (!data) return undefined;
+    return { render: (width) => renderStatusEntry(data, width, theme), invalidate: () => {} };
+  });
   pi.registerCommand("mesh", {
     description: "mesh inter-agent coms: status, join/leave, alias, log, ping, broker",
     handler: async (args, ctx) => {
@@ -465,9 +471,12 @@ export function registerCommands(
             notify(ctx, "usage: /mesh inbox [flush]");
           }
           break;
-        case "status":
-          await cmdStatus(rt, ctx, rest[0]);
+        case "status": {
+          const options = parseStatusArgs(rest);
+          if (options) await cmdStatus(rt, ctx, pi, options);
+          else notify(ctx, `usage: ${STATUS_USAGE}`);
           break;
+        }
         case "join": {
   // `/mesh join <room> [as <alias>] [observer]`
           const parsed = parseJoinArgs(rest);
