@@ -92,3 +92,26 @@ describe("/mesh argument completion", () => {
     assert.deepEqual(await values("join as ali"), []);
   });
 });
+
+describe("/mjoin completion", () => {
+  it("is discoverable as a separate root command and completes without a join prefix", async () => {
+    const { provider, values } = setup();
+    const options = { signal: new AbortController().signal };
+    const root = await provider.getSuggestions(["/mj"], 0, 3, options);
+    const item = root?.items.find(({ value }) => value === "mjoin");
+    assert.ok(item && root);
+    assert.deepEqual(provider.applyCompletion(["/mj"], 0, 3, item, root.prefix).lines, ["/mjoin "]);
+    assert.deepEqual(await values("f", "mjoin"), ["f"]);
+    assert.deepEqual(await values("observer f", "mjoin"), ["observer f"]);
+  });
+
+  it("preserves valid shorthand input and never suggests a placeholder alias", async () => {
+    const { values } = setup();
+    assert.deepEqual(await values("foo ", "mjoin"), ["foo ", "foo as", "foo observer"]);
+    assert.deepEqual(await values("foo fox ", "mjoin"), ["foo fox ", "foo fox observer"]);
+    assert.deepEqual(await values("foo o", "mjoin"), ["foo o", "foo observer"]);
+    assert.deepEqual(await values("foo as ", "mjoin"), []);
+    assert.deepEqual(await values("foo as ali", "mjoin"), []);
+    assert.deepEqual(await values("foo observer fox ", "mjoin"), []);
+  });
+});

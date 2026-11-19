@@ -38,7 +38,7 @@ async function setup(t: TestContext) {
     events,
     on: (event: string, fn: SessionHookHandler) => { hooks.set(event, [...hooks.get(event) ?? [], fn]); },
     registerTool: (tool: ToolDefinition) => { tools.set(tool.name, tool); },
-    registerCommand: (_name: string, spec: { handler: typeof command }) => { command = spec.handler; },
+    registerCommand: (name: string, spec: { handler: typeof command }) => { if (name === "mesh") command = spec.handler; },
     sendMessage: (message: InboundMessage, options?: SendMessageOptions) => {
       if (throwReady && message.customType === "mesh-context") { failures += 1; invalidated = true; throw new Error("ready context unavailable"); }
       sent.push({ message, options });
